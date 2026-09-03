@@ -47,6 +47,9 @@ importers:
       '@fastify/type-provider-typebox':
         specifier: latest
         version: 6.1.0(typebox@1.3.25)
+      '@pinjamakun/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@pinjamakun/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -84,7 +87,7 @@ importers:
         version: 19.2.18
       '@types/react-dom':
         specifier: latest
-        version: 19.2.5(@types/react@19.2.18)
+        version: 19.2.6(@types/react@19.2.18)
       '@vitejs/plugin-react':
         specifier: latest
         version: 6.1.1(vite@8.2.2(@types/node@26.4.1)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13))
@@ -127,7 +130,7 @@ importers:
         version: 19.2.18
       '@types/react-dom':
         specifier: latest
-        version: 19.2.5(@types/react@19.2.18)
+        version: 19.2.6(@types/react@19.2.18)
       '@types/webextension-polyfill':
         specifier: latest
         version: 0.12.6
@@ -716,8 +719,8 @@ packages:
   '@types/node@26.4.1':
     resolution: {integrity: sha512-k97ENvZWtvA6yqz5/FS6a7duDgOPEeOQOc2iKS/nY6mX6qJUKtLnWzQS+Xj6tXweyj6ZcTAK2Qecetnvi9nCLA==}
 
-  '@types/react-dom@19.2.5':
-    resolution: {integrity: sha512-fMPwH9v7r/pp43yUd2/Mbiex5KouJwwR3dzHkhLREUC6764VyDsqxhAxv6OFEYR1RhjOyD1naqba8ECDBe7ZQg==}
+  '@types/react-dom@19.2.6':
+    resolution: {integrity: sha512-bzczc+lpPxs7hFBkaOht7j/zVcSZVBGZZajtQoMhTDTrwVCcNa+bd0+LfhDXhnEnT4OHHFBE2jLTenVL+UzF7Q==}
     peerDependencies:
       '@types/react': ^19.2.0
 
@@ -2515,7 +2518,7 @@ snapshots:
     dependencies:
       undici-types: 8.3.0
 
-  '@types/react-dom@19.2.5(@types/react@19.2.18)':
+  '@types/react-dom@19.2.6(@types/react@19.2.18)':
     dependencies:
       '@types/react': 19.2.18
 

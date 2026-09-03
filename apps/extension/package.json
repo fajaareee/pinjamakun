@@ -10,7 +10,7 @@
     "zip": "wxt zip && wxt zip -b firefox",
     "lint": "wxt prepare && eslint .",
     "typecheck": "wxt prepare && tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --exclude dist/**"
   },
   "dependencies": {
     "@pinjamakun/contracts": "workspace:*",

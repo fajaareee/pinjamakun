@@ -23,10 +23,14 @@ Persyaratan: Node.js 22+, pnpm 10+, dan Docker untuk PostgreSQL.
 3. Jalankan `pnpm dev` untuk workspace atau filter aplikasi yang dibutuhkan.
 4. Jalankan `pnpm check` sebelum commit.
 
-Build ekstensi menghasilkan target Chromium dan Firefox. Muat output Chromium unpacked dari folder `.output/chrome-mv3` untuk pengujian lokal. Firefox memakai output `.output/firefox-mv3`.
+PostgreSQL mewajibkan `POSTGRES_PASSWORD`; tidak ada password fallback. Jalankan Compose dengan
+environment dari `.env` yang tidak di-commit. Untuk produksi, API hanya boleh bind ke loopback dan
+dijalankan dari artefak `dist`, bukan source TypeScript.
+
+Build ekstensi menghasilkan target Chromium dan Firefox. Muat output Chromium unpacked dari folder `.output/chrome-mv3` untuk pengujian lokal. Firefox memakai output `.output/firefox-mv2` sesuai target WXT saat ini.
 
 ## Status implementasi
 
-Fondasi, kontrak, policy dasar, primitive WebCrypto, health API, dashboard awal, dan alur optional host permission telah tersedia. Pairing, database/auth, encrypted invitation, capture/apply cookie, dan sync relay berikutnya masih harus diimplementasikan sebelum data sesi nyata digunakan.
+Fondasi, kontrak, policy dasar, primitive WebCrypto, health API, dashboard awal, dan alur optional host permission telah tersedia. Pairing, database/auth, encrypted invitation, capture/apply cookie, dan sync relay berikutnya masih harus diimplementasikan sebelum data sesi nyata digunakan. "Siap produksi" pada kondisi ini berarti fondasi dapat di-build dan dioperasikan secara aman untuk evaluasi, bukan bahwa alur produk utama sudah lengkap.
 
 Baca `docs/architecture/threat-model.md` sebelum menambahkan operasi cookie atau token.

@@ -1,11 +1,22 @@
+import { readApiEnvironment } from '@pinjamakun/config';
 import { buildApp } from './app.js';
 
-const port = Number.parseInt(process.env.API_PORT ?? '3000', 10);
-const host = process.env.API_HOST ?? '127.0.0.1';
 const app = buildApp();
 
+function stop(signal: NodeJS.Signals) {
+  app.log.info({ signal }, 'API shutting down');
+  void app.close().catch((error: unknown) => {
+    app.log.error({ err: error }, 'API failed to shut down cleanly');
+    process.exitCode = 1;
+  });
+}
+
+process.once('SIGINT', stop);
+process.once('SIGTERM', stop);
+
 try {
-  await app.listen({ host, port });
+  const environment = readApiEnvironment(process.env);
+  await app.listen({ host: environment.host, port: environment.port });
 } catch (error) {
   app.log.error({ err: error }, 'API failed to start');
   process.exitCode = 1;

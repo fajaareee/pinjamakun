@@ -125,16 +125,19 @@ NODE_ENV=production
 PUBLIC_APP_URL=https://acc.fnoor.my.id
 API_HOST=127.0.0.1
 API_PORT=3000
-DATABASE_URL=postgresql://pinjamakun:GANTI_PASSWORD_DATABASE@127.0.0.1:5432/pinjamakun
-AUTH_SECRET=GANTI_DENGAN_SECRET_ACAK_MINIMAL_32_KARAKTER
+DATABASE_URL=postgresql://pinjamakun:GANTI_PASSWORD_DATABASE_YANG_SUDAH_URL_ENCODED@127.0.0.1:5432/pinjamakun
+AUTH_SECRET=GANTI_DENGAN_SECRET_ACAK_MINIMAL_32_BYTE
 TOKEN_HMAC_KEY=GANTI_DENGAN_SECRET_ACAK_YANG_BERBEDA
 SMTP_HOST=smtp.example.com
 SMTP_PORT=587
-SMTP_USER=GANTI_USER_SMTP
-SMTP_PASSWORD=GANTI_PASSWORD_SMTP
+SMTP_USER=GANTI_USER_SMTP_JIKA_DIGUNAKAN
+SMTP_PASSWORD=GANTI_PASSWORD_SMTP_JIKA_DIGUNAKAN
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 ```
+
+Jika password database berisi karakter khusus, URL-encode bagian password pada `DATABASE_URL`.
+Jangan menyalin secret contoh dari dokumentasi atau memakai secret yang pernah dikirim melalui chat.
 
 Amankan file:
 
@@ -198,7 +201,7 @@ Artefak utama:
 - Dashboard: `/opt/pinjamakun/apps/dashboard/dist`
 - API: `/opt/pinjamakun/apps/api/dist/server.js`
 - Ekstensi Chromium: `/opt/pinjamakun/apps/extension/.output/chrome-mv3`
-- Ekstensi Firefox: `/opt/pinjamakun/apps/extension/.output/firefox-mv3`
+- Ekstensi Firefox: `/opt/pinjamakun/apps/extension/.output/firefox-mv2`
 
 Ekstensi browser tidak dijalankan di VPS. Artefaknya harus diuji lalu didistribusikan melalui store browser atau mekanisme organisasi yang sesuai.
 
@@ -233,6 +236,13 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
 ReadWritePaths=/var/lib/pinjamakun
 UMask=0077
 
@@ -278,6 +288,9 @@ server {
     index index.html;
 
     location /api/ {
+        limit_except GET HEAD OPTIONS {
+            deny all;
+        }
         proxy_pass http://127.0.0.1:3000/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -307,8 +320,14 @@ server {
     add_header X-Content-Type-Options nosniff always;
     add_header Referrer-Policy strict-origin-when-cross-origin always;
     add_header X-Frame-Options DENY always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+    add_header Content-Security-Policy "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'" always;
 }
 ```
+
+Pembatasan method di atas sesuai kondisi repository yang hanya memiliki health endpoint. Hapus atau
+persempit aturan tersebut secara sadar ketika endpoint mutation yang terautorisasi telah tersedia;
+jangan membuka semua method secara global tanpa rate limit dan validasi CSRF/origin yang sesuai.
 
 Perhatikan trailing slash pada `location /api/` dan `proxy_pass`. Konfigurasi tersebut mengubah `/api/health` menjadi `/health` pada Fastify.
 
@@ -415,6 +434,12 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
 
 [Install]
 WantedBy=multi-user.target
@@ -452,10 +477,12 @@ sudo -u pinjamakun git pull --ff-only origin main
 sudo -u pinjamakun pnpm install --frozen-lockfile
 sudo -u pinjamakun pnpm check
 sudo systemctl restart pinjamakun-api
+sudo systemctl is-active --quiet pinjamakun-api
 sudo nginx -t
 sudo systemctl reload nginx
 sudo systemctl restart pinjamakun-tunnel
-curl --fail https://acc.fnoor.my.id/health
+sudo systemctl is-active --quiet pinjamakun-tunnel
+curl --fail --retry 5 --retry-delay 2 https://acc.fnoor.my.id/health
 ```
 
 Gunakan `--ff-only` agar server tidak membuat merge commit. Untuk zero-downtime deployment di masa depan, gunakan direktori release bertimestamp dan symlink `current` setelah API memiliki migrasi yang backward-compatible.

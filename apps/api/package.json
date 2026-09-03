@@ -9,10 +9,11 @@
     "start": "node dist/server.js",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run --exclude dist/**"
   },
   "dependencies": {
     "@fastify/type-provider-typebox": "latest",
+    "@pinjamakun/config": "workspace:*",
     "@pinjamakun/contracts": "workspace:*",
     "@sinclair/typebox": "latest",
     "fastify": "latest"
