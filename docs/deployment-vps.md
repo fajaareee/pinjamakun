@@ -350,111 +350,69 @@ curl --fail -H 'Host: acc.fnoor.my.id' http://127.0.0.1:8080/health
 curl --fail -H 'Host: acc.fnoor.my.id' http://127.0.0.1:8080/api/health
 ```
 
-## 11. Instal dan konfigurasi Cloudflare Tunnel
+## 11. Konfigurasi Cloudflare Tunnel dari dashboard
 
-Tambahkan repository resmi Cloudflare dan instal `cloudflared`:
+Tunnel dan public hostname dikelola langsung melalui Cloudflare Zero Trust Dashboard. Buka
+**Cloudflare Dashboard → Zero Trust → Networks → Connectors → Cloudflare Tunnels**, lalu:
+
+1. Pilih **Create a tunnel**.
+2. Pilih connector **Cloudflared**.
+3. Beri nama tunnel `pinjamakun-vps`.
+4. Pilih environment **Debian** dan arsitektur VPS yang sesuai.
+5. Salin perintah instalasi yang ditampilkan Cloudflare. Perintah tersebut memuat token tunnel yang
+   unik dan akan memasang `cloudflared` sebagai service.
+
+Jalankan perintah hasil dashboard langsung pada VPS. Bentuknya menyerupai contoh berikut, tetapi
+gunakan perintah dan token asli yang ditampilkan untuk tunnel tersebut:
 
 ```bash
-sudo mkdir -p --mode=0755 /usr/share/keyrings
-curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg > /dev/null
-echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
-sudo apt update
-sudo apt install -y cloudflared
+sudo cloudflared service install <TUNNEL-TOKEN-DARI-DASHBOARD>
+```
+
+Token tunnel adalah secret. Jangan commit, simpan dalam dokumentasi, kirim melalui chat, atau masukkan
+ke log. Jika token pernah terekspos, rotasi token dari dashboard sebelum melanjutkan.
+
+Kembali ke halaman tunnel dan tunggu connector berstatus **Healthy**. Verifikasi service di VPS tanpa
+mencetak token:
+
+```bash
+sudo systemctl status cloudflared --no-pager
+sudo systemctl is-enabled cloudflared
 cloudflared --version
 ```
 
-Autentikasikan VPS. Pada server headless, buka URL yang dicetak perintah ini pada browser lokal, login ke Cloudflare, lalu pilih zone `fnoor.my.id`:
+### Tambahkan public hostname
+
+Pada tunnel `pinjamakun-vps`, buka tab **Public Hostnames** atau **Routes**, lalu pilih
+**Add a public hostname** dan isi:
+
+- **Subdomain:** `acc`
+- **Domain:** `fnoor.my.id`
+- **Path:** kosong
+- **Service type:** `HTTP`
+- **URL:** `127.0.0.1:8080`
+
+Simpan konfigurasi. Cloudflare akan mengelola route DNS hostname menuju tunnel; tidak perlu menjalankan
+`cloudflared tunnel route dns` atau membuat file `/etc/cloudflared/config.yml` secara manual. Jangan
+membuat A/AAAA record menuju IP VPS sebagai fallback.
+
+Nginx tetap diperlukan karena Cloudflare meneruskan path tanpa menghapus prefix `/api/`, sedangkan
+konfigurasi Nginx mengubah `/api/health` menjadi `/health` pada Fastify.
+
+Pastikan tunnel terhubung dan origin lokal merespons:
 
 ```bash
-cloudflared tunnel login
+sudo systemctl is-active cloudflared
+curl --fail -H 'Host: acc.fnoor.my.id' http://127.0.0.1:8080/health
+curl --fail -H 'Host: acc.fnoor.my.id' http://127.0.0.1:8080/api/health
 ```
 
-Buat named tunnel dan catat UUID yang ditampilkan:
+Jika service sudah terpasang dari tunnel lama, jangan menjalankan `service install` berulang kali.
+Gunakan opsi **Configure** atau rotasi token pada dashboard, kemudian restart connector bila diperlukan:
 
 ```bash
-cloudflared tunnel create pinjamakun-vps
-cloudflared tunnel list
-```
-
-Perintah tersebut membuat file credential `<TUNNEL-UUID>.json` di `~/.cloudflared`. Pasang credential dan konfigurasi untuk service system-wide:
-
-```bash
-sudo install -d -m 0750 -o root -g root /etc/cloudflared
-sudo install -m 0600 "$HOME/.cloudflared/<TUNNEL-UUID>.json" /etc/cloudflared/<TUNNEL-UUID>.json
-sudo nano /etc/cloudflared/config.yml
-```
-
-Ganti `<TUNNEL-UUID>` pada nama file dan isi berikut:
-
-```yaml
-tunnel: <TUNNEL-UUID>
-credentials-file: /etc/cloudflared/<TUNNEL-UUID>.json
-
-ingress:
-    - hostname: acc.fnoor.my.id
-        service: http://127.0.0.1:8080
-        originRequest:
-            connectTimeout: 10s
-    - service: http_status:404
-```
-
-Catch-all `http_status:404` wajib menjadi aturan terakhir. Nginx tetap dipakai karena `cloudflared` meneruskan path tanpa menghapus prefix `/api/`, sementara aplikasi memerlukan rewrite `/api/health` menjadi `/health`.
-
-Validasi konfigurasi dan rule:
-
-```bash
-sudo cloudflared --config /etc/cloudflared/config.yml tunnel ingress validate
-sudo cloudflared --config /etc/cloudflared/config.yml tunnel ingress rule https://acc.fnoor.my.id/api/health
-```
-
-Buat DNS route. Perintah ini membuat CNAME terkelola menuju `<TUNNEL-UUID>.cfargotunnel.com`; jangan membuat A/AAAA record ke IP VPS:
-
-```bash
-cloudflared tunnel route dns pinjamakun-vps acc.fnoor.my.id
-```
-
-Buat service systemd eksplisit agar lokasi konfigurasi dan credential tidak ambigu:
-
-```bash
-sudo nano /etc/systemd/system/pinjamakun-tunnel.service
-```
-
-Isi:
-
-```ini
-[Unit]
-Description=Cloudflare Tunnel for PinjamAkun
-After=network-online.target nginx.service pinjamakun-api.service
-Wants=network-online.target
-Requires=nginx.service
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/cloudflared --no-autoupdate --config /etc/cloudflared/config.yml tunnel run
-Restart=on-failure
-RestartSec=5
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-PrivateTmp=true
-ProtectKernelTunables=true
-ProtectKernelModules=true
-ProtectControlGroups=true
-RestrictSUIDSGID=true
-RestrictNamespaces=true
-LockPersonality=true
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Aktifkan tunnel:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now pinjamakun-tunnel
-sudo systemctl status pinjamakun-tunnel --no-pager
-cloudflared tunnel info pinjamakun-vps
+sudo systemctl restart cloudflared
+sudo journalctl -u cloudflared -n 100 --no-pager
 ```
 
 Cloudflare menyediakan HTTPS publik di edge dan koneksi tunnel terenkripsi menuju VPS. Karena origin hanya loopback, sertifikat Let's Encrypt pada VPS tidak diperlukan. Jangan gunakan mode SSL/TLS `Flexible` sebagai pola deployment untuk origin lain.
@@ -483,8 +441,8 @@ sudo systemctl restart pinjamakun-api
 sudo systemctl is-active --quiet pinjamakun-api
 sudo nginx -t
 sudo systemctl reload nginx
-sudo systemctl restart pinjamakun-tunnel
-sudo systemctl is-active --quiet pinjamakun-tunnel
+sudo systemctl restart cloudflared
+sudo systemctl is-active --quiet cloudflared
 curl --fail --retry 5 --retry-delay 2 https://acc.fnoor.my.id/health
 ```
 
@@ -522,7 +480,7 @@ Periksa service:
 
 ```bash
 sudo systemctl is-active pinjamakun-api nginx docker
-sudo systemctl is-active pinjamakun-tunnel
+sudo systemctl is-active cloudflared
 sudo docker compose -f /opt/pinjamakun/compose.yaml ps
 curl --fail https://acc.fnoor.my.id/health
 ```
@@ -573,14 +531,13 @@ Pastikan `pinjamakun-api` aktif dan menggunakan `API_HOST=127.0.0.1` serta `API_
 ### Cloudflare mengembalikan 502/1033
 
 ```bash
-sudo systemctl status pinjamakun-tunnel --no-pager
-sudo journalctl -u pinjamakun-tunnel -n 100 --no-pager
-sudo cloudflared --config /etc/cloudflared/config.yml tunnel ingress validate
-cloudflared tunnel info pinjamakun-vps
+sudo systemctl status cloudflared --no-pager
+sudo journalctl -u cloudflared -n 100 --no-pager
 curl -v -H 'Host: acc.fnoor.my.id' http://127.0.0.1:8080/health
 ```
 
-Pastikan UUID dan credential cocok, DNS route mengarah ke tunnel yang benar, Nginx aktif pada loopback port `8080`, dan VPS dapat membuat koneksi keluar pada port `7844`.
+Pastikan connector pada dashboard berstatus **Healthy**, public hostname mengarah ke
+`http://127.0.0.1:8080`, Nginx aktif, dan VPS dapat membuat koneksi keluar pada port `7844`.
 
 ### Repository gagal di-update
 
@@ -601,7 +558,7 @@ Jangan mengedit source code langsung pada VPS. Kembalikan perubahan lokal atau d
 - [ ] UFW hanya membuka SSH; port web, API, dan database tidak terbuka inbound.
 - [ ] PostgreSQL hanya bind ke `127.0.0.1`.
 - [ ] Nginx hanya listen pada `127.0.0.1:8080`.
-- [ ] `pinjamakun-tunnel` aktif dan ingress config lolos validasi.
+- [ ] Connector `cloudflared` aktif dan tunnel pada dashboard berstatus **Healthy**.
 - [ ] Semua placeholder secret telah diganti dan berbeda satu sama lain.
 - [ ] File environment memiliki permission `0640` atau lebih ketat.
 - [ ] `pnpm check` berhasil pada commit yang di-deploy.

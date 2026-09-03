@@ -131,47 +131,39 @@ sudo journalctl -u pinjamakun-api -n 100 --no-pager
 
 ## 5. Hubungkan Cloudflare Tunnel
 
-Setelah `cloudflared` terinstal, autentikasikan dan buat tunnel:
+Kelola tunnel melalui **Cloudflare Dashboard → Zero Trust → Networks → Connectors → Cloudflare
+Tunnels**:
+
+1. Pilih **Create a tunnel** dan connector **Cloudflared**.
+2. Beri nama `pinjamakun-vps`.
+3. Pilih environment **Debian** dan arsitektur VPS.
+4. Salin dan jalankan perintah instalasi connector yang ditampilkan dashboard pada VPS.
+5. Tunggu connector berstatus **Healthy**.
+
+Perintah dashboard memuat token rahasia dan biasanya menyerupai:
 
 ```bash
-cloudflared tunnel login
-cloudflared tunnel create pinjamakun-vps
-cloudflared tunnel list
+sudo cloudflared service install <TUNNEL-TOKEN-DARI-DASHBOARD>
 ```
 
-Salin credential tunnel ke `/etc/cloudflared`, lalu buat `/etc/cloudflared/config.yml`. Ganti
-`<TUNNEL-UUID>` dengan UUID yang dihasilkan:
+Jangan commit atau membagikan token tersebut. Pada tab **Public Hostnames** atau **Routes**, tambahkan:
 
-```yaml
-tunnel: <TUNNEL-UUID>
-credentials-file: /etc/cloudflared/<TUNNEL-UUID>.json
+- Subdomain `acc`
+- Domain `fnoor.my.id`
+- Path kosong
+- Service `HTTP`
+- URL `127.0.0.1:8080`
 
-ingress:
-  - hostname: acc.fnoor.my.id
-    service: http://127.0.0.1:8080
-    originRequest:
-      connectTimeout: 10s
-  - service: http_status:404
-```
-
-Validasi konfigurasi dan buat DNS route:
+Cloudflare mengelola DNS dan konfigurasi tunnel secara remote. Tidak perlu membuat
+`/etc/cloudflared/config.yml`, credential JSON, DNS route CLI, atau unit systemd khusus. Verifikasi
+connector bawaan:
 
 ```bash
-sudo cloudflared --config /etc/cloudflared/config.yml tunnel ingress validate
-cloudflared tunnel route dns pinjamakun-vps acc.fnoor.my.id
+sudo systemctl status cloudflared --no-pager
+sudo systemctl is-enabled cloudflared
 ```
 
-Pasang unit `pinjamakun-tunnel.service` dari bagian 11 [`deployment-vps.md`](deployment-vps.md), lalu
-aktifkan:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now pinjamakun-tunnel
-sudo systemctl status pinjamakun-tunnel --no-pager
-```
-
-Cloudflare harus membuat CNAME menuju `<TUNNEL-UUID>.cfargotunnel.com`. Jangan menambahkan A/AAAA
-record menuju IP VPS sebagai fallback.
+Jangan menambahkan A/AAAA record menuju IP VPS sebagai fallback.
 
 ## 6. Verifikasi dari internet
 
@@ -219,8 +211,8 @@ sudo systemctl restart pinjamakun-api
 sudo systemctl is-active --quiet pinjamakun-api
 sudo nginx -t
 sudo systemctl reload nginx
-sudo systemctl restart pinjamakun-tunnel
-sudo systemctl is-active --quiet pinjamakun-tunnel
+sudo systemctl restart cloudflared
+sudo systemctl is-active --quiet cloudflared
 curl --fail --retry 5 --retry-delay 2 https://acc.fnoor.my.id/health
 ```
 
