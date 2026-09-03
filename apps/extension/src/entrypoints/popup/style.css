@@ -1,0 +1,85 @@
+:root {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  color: #17201b;
+  background: #f4f7f5;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 340px;
+}
+main {
+  padding: 18px;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+header div:last-child {
+  display: grid;
+  gap: 2px;
+}
+header span,
+small {
+  color: #68736c;
+  font-size: 11px;
+}
+.mark {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: white;
+  background: #176b45;
+  border-radius: 10px;
+}
+.status {
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #d5ded8;
+  background: white;
+  border-radius: 12px;
+}
+p {
+  margin: 3px 0 0;
+}
+.site {
+  margin: 18px 2px;
+}
+.site p {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+button {
+  border: 0;
+  border-radius: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: white;
+  background: #176b45;
+  font-weight: 700;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+button:active {
+  transform: translateY(1px);
+}
+.notice {
+  color: #68736c;
+  font-size: 11px;
+  line-height: 1.45;
+  margin-top: 12px;
+}
