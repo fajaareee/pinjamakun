@@ -2,11 +2,12 @@
 
 Panduan ini men-deploy kondisi repository PinjamAkun saat ini pada VPS Ubuntu 22.04/24.04 menggunakan:
 
-- Nginx sebagai reverse proxy dan static file server.
-- Let's Encrypt untuk HTTPS.
+- Nginx lokal sebagai reverse proxy dan static file server.
+- Cloudflare Tunnel sebagai satu-satunya jalur publik ke `acc.fnoor.my.id`.
+- TLS publik yang diterminasi oleh Cloudflare.
 - Node.js 22 dan pnpm 10 untuk API.
 - Docker Compose untuk PostgreSQL.
-- systemd untuk menjaga API tetap berjalan.
+- systemd untuk menjaga API dan tunnel tetap berjalan.
 
 > **Status aplikasi:** repository saat ini masih berupa fondasi MVP. Dashboard dan endpoint health API dapat di-deploy, tetapi database/auth, pairing perangkat, undangan terenkripsi, worker queue, serta capture/apply cookie belum diimplementasikan. Jangan gunakan untuk data sesi nyata sebelum fitur tersebut selesai dan menjalani security review.
 
@@ -16,11 +17,12 @@ Siapkan:
 
 - VPS Ubuntu 22.04 atau 24.04 dengan minimal 1 vCPU dan 1 GB RAM.
 - User non-root dengan akses `sudo`.
-- Domain, misalnya `app.example.com`, yang A/AAAA record-nya sudah mengarah ke IP VPS.
-- Port `22`, `80`, dan `443` dapat diakses.
+- Zone `fnoor.my.id` aktif di Cloudflare dan nameserver domain sudah memakai Cloudflare.
+- Hak untuk membuat Cloudflare Tunnel dan DNS hostname `acc.fnoor.my.id`.
+- VPS dapat membuat koneksi keluar ke Cloudflare pada port `7844`; inbound hanya memerlukan SSH.
 - Akses baca ke repository `https://github.com/fajaareee/pinjamakun.git`.
 
-Semua contoh menggunakan direktori `/opt/pinjamakun` dan domain `app.example.com`. Ganti keduanya sesuai lingkungan.
+Semua contoh menggunakan direktori `/opt/pinjamakun`, hostname `acc.fnoor.my.id`, dan named tunnel `pinjamakun-vps`.
 
 ## 2. Persiapkan server
 
@@ -29,17 +31,18 @@ Masuk ke VPS, lalu perbarui paket:
 ```bash
 sudo apt update
 sudo apt upgrade -y
-sudo apt install -y ca-certificates curl git nginx certbot python3-certbot-nginx
+sudo apt install -y ca-certificates curl git nginx
 ```
 
 Aktifkan firewall tanpa memutus SSH:
 
 ```bash
 sudo ufw allow OpenSSH
-sudo ufw allow 'Nginx Full'
 sudo ufw enable
 sudo ufw status
 ```
+
+Jangan membuka port `80`, `443`, `3000`, atau `5432` ke internet. Nginx, API, dan PostgreSQL hanya bind ke loopback; `cloudflared` membuat koneksi keluar menuju Cloudflare.
 
 ## 3. Instal Docker
 
@@ -119,7 +122,7 @@ Isi file berikut dan ganti seluruh placeholder:
 
 ```dotenv
 NODE_ENV=production
-PUBLIC_APP_URL=https://app.example.com
+PUBLIC_APP_URL=https://acc.fnoor.my.id
 API_HOST=127.0.0.1
 API_PORT=3000
 DATABASE_URL=postgresql://pinjamakun:GANTI_PASSWORD_DATABASE@127.0.0.1:5432/pinjamakun
@@ -256,7 +259,7 @@ sudo journalctl -u pinjamakun-api -n 100 --no-pager
 
 Worker saat ini hanya berupa shell dan langsung selesai. Jangan membuat service worker persisten sebelum queue handler dan transactional outbox diimplementasikan.
 
-## 10. Konfigurasi Nginx
+## 10. Konfigurasi Nginx lokal
 
 Buat virtual host:
 
@@ -264,13 +267,12 @@ Buat virtual host:
 sudo nano /etc/nginx/sites-available/pinjamakun
 ```
 
-Isi dan ganti domain:
+Isi konfigurasi berikut. Nginx hanya menerima koneksi dari VPS sendiri pada `127.0.0.1:8080`:
 
 ```nginx
 server {
-    listen 80;
-    listen [::]:80;
-    server_name app.example.com;
+    listen 127.0.0.1:8080;
+    server_name acc.fnoor.my.id;
 
     root /opt/pinjamakun/apps/dashboard/dist;
     index index.html;
@@ -319,27 +321,124 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-Uji HTTP sebelum meminta sertifikat:
+Uji origin lokal dengan Host header yang benar:
 
 ```bash
-curl --fail http://app.example.com/health
+curl --fail -H 'Host: acc.fnoor.my.id' http://127.0.0.1:8080/health
+curl --fail -H 'Host: acc.fnoor.my.id' http://127.0.0.1:8080/api/health
 ```
 
-## 11. Aktifkan HTTPS
+## 11. Instal dan konfigurasi Cloudflare Tunnel
+
+Tambahkan repository resmi Cloudflare dan instal `cloudflared`:
 
 ```bash
-sudo certbot --nginx -d app.example.com
-sudo certbot renew --dry-run
+sudo mkdir -p --mode=0755 /usr/share/keyrings
+curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg > /dev/null
+echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | sudo tee /etc/apt/sources.list.d/cloudflared.list
+sudo apt update
+sudo apt install -y cloudflared
+cloudflared --version
 ```
+
+Autentikasikan VPS. Pada server headless, buka URL yang dicetak perintah ini pada browser lokal, login ke Cloudflare, lalu pilih zone `fnoor.my.id`:
+
+```bash
+cloudflared tunnel login
+```
+
+Buat named tunnel dan catat UUID yang ditampilkan:
+
+```bash
+cloudflared tunnel create pinjamakun-vps
+cloudflared tunnel list
+```
+
+Perintah tersebut membuat file credential `<TUNNEL-UUID>.json` di `~/.cloudflared`. Pasang credential dan konfigurasi untuk service system-wide:
+
+```bash
+sudo install -d -m 0750 -o root -g root /etc/cloudflared
+sudo install -m 0600 "$HOME/.cloudflared/<TUNNEL-UUID>.json" /etc/cloudflared/<TUNNEL-UUID>.json
+sudo nano /etc/cloudflared/config.yml
+```
+
+Ganti `<TUNNEL-UUID>` pada nama file dan isi berikut:
+
+```yaml
+tunnel: <TUNNEL-UUID>
+credentials-file: /etc/cloudflared/<TUNNEL-UUID>.json
+
+ingress:
+    - hostname: acc.fnoor.my.id
+        service: http://127.0.0.1:8080
+        originRequest:
+            connectTimeout: 10s
+    - service: http_status:404
+```
+
+Catch-all `http_status:404` wajib menjadi aturan terakhir. Nginx tetap dipakai karena `cloudflared` meneruskan path tanpa menghapus prefix `/api/`, sementara aplikasi memerlukan rewrite `/api/health` menjadi `/health`.
+
+Validasi konfigurasi dan rule:
+
+```bash
+sudo cloudflared --config /etc/cloudflared/config.yml tunnel ingress validate
+sudo cloudflared --config /etc/cloudflared/config.yml tunnel ingress rule https://acc.fnoor.my.id/api/health
+```
+
+Buat DNS route. Perintah ini membuat CNAME terkelola menuju `<TUNNEL-UUID>.cfargotunnel.com`; jangan membuat A/AAAA record ke IP VPS:
+
+```bash
+cloudflared tunnel route dns pinjamakun-vps acc.fnoor.my.id
+```
+
+Buat service systemd eksplisit agar lokasi konfigurasi dan credential tidak ambigu:
+
+```bash
+sudo nano /etc/systemd/system/pinjamakun-tunnel.service
+```
+
+Isi:
+
+```ini
+[Unit]
+Description=Cloudflare Tunnel for PinjamAkun
+After=network-online.target nginx.service pinjamakun-api.service
+Wants=network-online.target
+Requires=nginx.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/cloudflared --no-autoupdate --config /etc/cloudflared/config.yml tunnel run
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Aktifkan tunnel:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now pinjamakun-tunnel
+sudo systemctl status pinjamakun-tunnel --no-pager
+cloudflared tunnel info pinjamakun-vps
+```
+
+Cloudflare menyediakan HTTPS publik di edge dan koneksi tunnel terenkripsi menuju VPS. Karena origin hanya loopback, sertifikat Let's Encrypt pada VPS tidak diperlukan. Jangan gunakan mode SSL/TLS `Flexible` sebagai pola deployment untuk origin lain.
 
 Uji endpoint publik:
 
 ```bash
-curl --fail https://app.example.com/health
-curl --fail https://app.example.com/api/health
+curl --fail https://acc.fnoor.my.id/health
+curl --fail https://acc.fnoor.my.id/api/health
 ```
 
-Gunakan HTTPS untuk deployment produksi, OAuth callback, pairing, dan komunikasi ekstensi. Jangan mengizinkan fallback HTTP untuk data sensitif.
+Gunakan URL `https://acc.fnoor.my.id` untuk OAuth callback, pairing, dan komunikasi ekstensi. Jangan membuat route publik langsung ke port origin sebagai fallback.
 
 ## 12. Update deployment
 
@@ -355,7 +454,8 @@ sudo -u pinjamakun pnpm check
 sudo systemctl restart pinjamakun-api
 sudo nginx -t
 sudo systemctl reload nginx
-curl --fail https://app.example.com/health
+sudo systemctl restart pinjamakun-tunnel
+curl --fail https://acc.fnoor.my.id/health
 ```
 
 Gunakan `--ff-only` agar server tidak membuat merge commit. Untuk zero-downtime deployment di masa depan, gunakan direktori release bertimestamp dan symlink `current` setelah API memiliki migrasi yang backward-compatible.
@@ -392,8 +492,9 @@ Periksa service:
 
 ```bash
 sudo systemctl is-active pinjamakun-api nginx docker
+sudo systemctl is-active pinjamakun-tunnel
 sudo docker compose -f /opt/pinjamakun/compose.yaml ps
-curl --fail https://app.example.com/health
+curl --fail https://acc.fnoor.my.id/health
 ```
 
 Periksa kapasitas:
@@ -439,6 +540,18 @@ curl -v http://127.0.0.1:3000/health
 
 Pastikan `pinjamakun-api` aktif dan menggunakan `API_HOST=127.0.0.1` serta `API_PORT=3000`.
 
+### Cloudflare mengembalikan 502/1033
+
+```bash
+sudo systemctl status pinjamakun-tunnel --no-pager
+sudo journalctl -u pinjamakun-tunnel -n 100 --no-pager
+sudo cloudflared --config /etc/cloudflared/config.yml tunnel ingress validate
+cloudflared tunnel info pinjamakun-vps
+curl -v -H 'Host: acc.fnoor.my.id' http://127.0.0.1:8080/health
+```
+
+Pastikan UUID dan credential cocok, DNS route mengarah ke tunnel yang benar, Nginx aktif pada loopback port `8080`, dan VPS dapat membuat koneksi keluar pada port `7844`.
+
 ### Repository gagal di-update
 
 ```bash
@@ -452,15 +565,18 @@ Jangan mengedit source code langsung pada VPS. Kembalikan perubahan lokal atau d
 
 ## 16. Checklist produksi
 
-- [ ] DNS mengarah ke IP VPS.
+- [ ] Zone `fnoor.my.id` memakai nameserver Cloudflare.
+- [ ] `acc.fnoor.my.id` dirutekan ke named tunnel, bukan A/AAAA record IP VPS.
 - [ ] SSH menggunakan key; login root dan password SSH dinonaktifkan jika memungkinkan.
-- [ ] UFW hanya membuka port yang diperlukan.
+- [ ] UFW hanya membuka SSH; port web, API, dan database tidak terbuka inbound.
 - [ ] PostgreSQL hanya bind ke `127.0.0.1`.
+- [ ] Nginx hanya listen pada `127.0.0.1:8080`.
+- [ ] `pinjamakun-tunnel` aktif dan ingress config lolos validasi.
 - [ ] Semua placeholder secret telah diganti dan berbeda satu sama lain.
 - [ ] File environment memiliki permission `0640` atau lebih ketat.
 - [ ] `pnpm check` berhasil pada commit yang di-deploy.
 - [ ] API health check berhasil dari loopback dan domain publik.
-- [ ] HTTPS aktif dan renewal test berhasil.
+- [ ] HTTPS Cloudflare aktif dan tidak ada origin fallback publik.
 - [ ] Backup terenkripsi tersimpan di luar VPS dan restore pernah diuji.
 - [ ] Log telah diperiksa agar tidak memuat data sensitif.
 - [ ] Domain penggunaan dan kebijakan layanan tujuan telah ditinjau.
