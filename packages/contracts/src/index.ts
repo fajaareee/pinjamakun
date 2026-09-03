@@ -8,6 +8,29 @@ export const HealthResponseSchema = Type.Object({
 });
 export type HealthResponse = Static<typeof HealthResponseSchema>;
 
+export const AuthUserSchema = Type.Object({
+  id: Type.String({ format: 'uuid' }),
+  email: Type.String({ format: 'email' }),
+});
+export type AuthUser = Static<typeof AuthUserSchema>;
+
+export const AuthCredentialsSchema = Type.Object(
+  {
+    email: Type.String({ format: 'email', maxLength: 320 }),
+    password: Type.String({ minLength: 12, maxLength: 128 }),
+  },
+  { additionalProperties: false },
+);
+export type AuthCredentials = Static<typeof AuthCredentialsSchema>;
+
+export const AuthResponseSchema = Type.Object({ user: AuthUserSchema });
+export type AuthResponse = Static<typeof AuthResponseSchema>;
+
+export const AuthErrorSchema = Type.Object({
+  error: Type.String(),
+});
+export type AuthError = Static<typeof AuthErrorSchema>;
+
 export const PortableCookieSchema = Type.Object({
   name: Type.String({ minLength: 1 }),
   value: Type.String(),

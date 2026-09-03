@@ -12,7 +12,7 @@ Panduan ini men-deploy kondisi repository PinjamAkun saat ini pada VPS Ubuntu 22
 - Docker Compose untuk PostgreSQL.
 - systemd untuk menjaga API dan tunnel tetap berjalan.
 
-> **Status aplikasi:** repository saat ini masih berupa fondasi MVP. Dashboard dan endpoint health API dapat di-deploy, tetapi database/auth, pairing perangkat, undangan terenkripsi, worker queue, serta capture/apply cookie belum diimplementasikan. Jangan gunakan untuk data sesi nyata sebelum fitur tersebut selesai dan menjalani security review.
+> **Status aplikasi:** autentikasi email/password telah tersedia. Pairing perangkat, undangan terenkripsi, worker queue, serta capture/apply cookie belum diimplementasikan. Jangan gunakan untuk data sesi nyata sebelum fitur tersebut selesai dan menjalani security review.
 
 ## 1. Prasyarat
 
@@ -189,6 +189,7 @@ sudo --preserve-env=PATH docker compose exec postgres pg_isready -U pinjamakun -
 cd /opt/pinjamakun
 pnpm install --frozen-lockfile
 pnpm check
+sudo -u pinjamakun bash -c 'set -a; source /etc/pinjamakun/api.env; set +a; pnpm --filter @pinjamakun/api db:migrate'
 ```
 
 Perintah tersebut menjalankan formatting check, lint, typecheck, tests, dan seluruh build. Jangan lanjutkan deploy jika gagal.
@@ -291,9 +292,6 @@ server {
     index index.html;
 
     location /api/ {
-        limit_except GET HEAD OPTIONS {
-            deny all;
-        }
         proxy_pass http://127.0.0.1:3000/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -328,9 +326,8 @@ server {
 }
 ```
 
-Pembatasan method di atas sesuai kondisi repository yang hanya memiliki health endpoint. Hapus atau
-persempit aturan tersebut secara sadar ketika endpoint mutation yang terautorisasi telah tersedia;
-jangan membuka semua method secara global tanpa rate limit dan validasi CSRF/origin yang sesuai.
+Endpoint autentikasi mutation dilindungi pemeriksaan origin, cookie `SameSite=Strict`, validasi input,
+dan rate limit pada API. Jangan mengendurkan perlindungan tersebut pada konfigurasi proxy.
 
 Perhatikan trailing slash pada `location /api/` dan `proxy_pass`. Konfigurasi tersebut mengubah `/api/health` menjadi `/health` pada Fastify.
 

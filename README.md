@@ -36,6 +36,6 @@ Build ekstensi menghasilkan target Chromium dan Firefox. Muat output Chromium un
 
 ## Status implementasi
 
-Fondasi, kontrak, policy dasar, primitive WebCrypto, health API, dashboard awal, dan alur optional host permission telah tersedia. Pairing, database/auth, encrypted invitation, capture/apply cookie, dan sync relay berikutnya masih harus diimplementasikan sebelum data sesi nyata digunakan. "Siap produksi" pada kondisi ini berarti fondasi dapat di-build dan dioperasikan secara aman untuk evaluasi, bukan bahwa alur produk utama sudah lengkap.
+Fondasi, autentikasi email/password, kontrak, policy dasar, primitive WebCrypto, health API, dashboard awal, dan alur optional host permission telah tersedia. Pairing, encrypted invitation, capture/apply cookie, dan sync relay berikutnya masih harus diimplementasikan sebelum data sesi nyata digunakan. "Siap produksi" pada kondisi ini berarti fondasi dapat di-build dan dioperasikan secara aman untuk evaluasi, bukan bahwa alur produk utama sudah lengkap.
 
 Baca `docs/architecture/threat-model.md` sebelum menambahkan operasi cookie atau token.

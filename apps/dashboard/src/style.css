@@ -64,6 +64,21 @@ button {
 button:active {
   transform: translateY(1px);
 }
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.account-button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 260px;
+}
+.account-button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 main {
   max-width: 1220px;
   margin: auto;
@@ -196,6 +211,117 @@ h1 em {
   font-size: 14px;
   line-height: 1.6;
 }
+.auth-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(12, 25, 18, 0.58);
+  backdrop-filter: blur(8px);
+}
+.auth-dialog {
+  position: relative;
+  width: min(100%, 440px);
+  padding: 38px;
+  border: 1px solid #cbd9cf;
+  border-radius: 16px;
+  background: #f8faf8;
+  box-shadow: 0 28px 80px rgba(16, 45, 31, 0.24);
+}
+.icon-button {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  color: #526159;
+  background: transparent;
+}
+.auth-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  color: white;
+  background: #176b45;
+}
+.auth-dialog h2 {
+  margin: 22px 0 8px;
+  font-size: 26px;
+  letter-spacing: -0.03em;
+}
+.auth-intro {
+  margin: 0;
+  color: #5b6961;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: 24px 0 22px;
+  padding: 4px;
+  border-radius: 11px;
+  background: #e8eee9;
+}
+.auth-tabs button {
+  padding: 9px;
+  color: #5b6961;
+  background: transparent;
+}
+.auth-tabs button.active {
+  color: #152019;
+  background: white;
+  box-shadow: 0 2px 8px rgba(20, 50, 35, 0.08);
+}
+.auth-dialog form {
+  display: grid;
+}
+.auth-dialog label {
+  margin: 14px 0 7px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.auth-dialog input {
+  width: 100%;
+  padding: 12px 13px;
+  border: 1px solid #bdcbc1;
+  border-radius: 9px;
+  outline: none;
+  color: #152019;
+  background: white;
+  font: inherit;
+}
+.auth-dialog input:focus {
+  border-color: #176b45;
+  box-shadow: 0 0 0 3px rgba(23, 107, 69, 0.13);
+}
+.auth-dialog form small {
+  margin-top: 7px;
+  color: #647068;
+}
+.auth-error {
+  margin: 14px 0 0;
+  color: #a12525;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.auth-submit {
+  width: 100%;
+  margin-top: 22px;
+  padding: 13px;
+  background: #176b45;
+}
+@media (prefers-reduced-transparency: reduce) {
+  .auth-backdrop {
+    background: #27362e;
+    backdrop-filter: none;
+  }
+}
 @media (max-width: 800px) {
   nav a:not(.brand) {
     display: none;
@@ -215,5 +341,11 @@ h1 em {
     border-left: 0;
     border-top: 1px solid #d5dfd8;
     padding: 28px 0;
+  }
+  .account-button span {
+    max-width: 120px;
+  }
+  .auth-dialog {
+    padding: 30px 24px;
   }
 }

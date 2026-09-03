@@ -4,9 +4,8 @@ Panduan ringkas ini menerbitkan dashboard dan health API ke
 `https://acc.fnoor.my.id` menggunakan VPS Ubuntu, Nginx, dan Cloudflare Tunnel.
 Instruksi instalasi yang lebih rinci tersedia di [`deployment-vps.md`](deployment-vps.md).
 
-> **Batas implementasi:** deployment saat ini menampilkan landing page dan menyediakan health API.
-> Tombol **Masuk** belum berfungsi karena autentikasi, pairing, database aplikasi, dan sync relay belum
-> diimplementasikan. Jangan gunakan deployment ini untuk data sesi nyata.
+> **Batas implementasi:** autentikasi email/password tersedia, tetapi pairing, undangan terenkripsi,
+> dan sync relay belum diimplementasikan. Jangan gunakan deployment ini untuk data sesi nyata.
 
 ## Arsitektur production
 
@@ -101,6 +100,7 @@ sudo docker compose --env-file /etc/pinjamakun/postgres.env ps
 sudo docker compose --env-file /etc/pinjamakun/postgres.env exec postgres pg_isready -U pinjamakun -d pinjamakun
 pnpm install --frozen-lockfile
 pnpm check
+sudo -u pinjamakun bash -c 'set -a; source /etc/pinjamakun/api.env; set +a; pnpm --filter @pinjamakun/api db:migrate'
 sudo chown -R pinjamakun:pinjamakun /opt/pinjamakun
 ```
 
@@ -180,7 +180,7 @@ Kemudian buka `https://acc.fnoor.my.id` pada browser. Hasil yang diharapkan:
 - Landing page tampil melalui HTTPS.
 - `/health` dan `/api/health` mengembalikan JSON dengan `status: "ok"`.
 - Tidak ada port origin yang dapat diakses langsung dari internet.
-- Tombol **Masuk** tetap belum aktif sampai fitur autentikasi diimplementasikan.
+- Tombol **Masuk** membuka autentikasi email/password dan sesi tetap aktif setelah halaman dimuat ulang.
 
 ## 7. Memasang ekstensi browser
 
@@ -207,6 +207,7 @@ sudo -u pinjamakun git checkout main
 sudo -u pinjamakun git pull --ff-only origin main
 sudo -u pinjamakun pnpm install --frozen-lockfile
 sudo -u pinjamakun pnpm check
+sudo -u pinjamakun bash -c 'set -a; source /etc/pinjamakun/api.env; set +a; pnpm --filter @pinjamakun/api db:migrate'
 sudo systemctl restart pinjamakun-api
 sudo systemctl is-active --quiet pinjamakun-api
 sudo nginx -t

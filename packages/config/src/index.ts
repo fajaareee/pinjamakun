@@ -13,6 +13,9 @@ export interface ApiEnvironment {
   readonly nodeEnvironment: NodeEnvironment;
   readonly host: string;
   readonly port: number;
+  readonly databaseUrl: string;
+  readonly authSecret: string;
+  readonly publicAppUrl: string;
 }
 
 const nodeEnvironments = new Set<NodeEnvironment>(['development', 'production', 'test']);
@@ -42,5 +45,8 @@ export function readApiEnvironment(
     nodeEnvironment: nodeEnvironment as NodeEnvironment,
     host,
     port: readPort(environment.API_PORT),
+    databaseUrl: requireEnvironment(environment, 'DATABASE_URL'),
+    authSecret: requireEnvironment(environment, 'AUTH_SECRET'),
+    publicAppUrl: requireEnvironment(environment, 'PUBLIC_APP_URL'),
   };
 }
