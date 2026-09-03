@@ -29,6 +29,11 @@ dijalankan dari artefak `dist`, bukan source TypeScript.
 
 Build ekstensi menghasilkan target Chromium dan Firefox. Muat output Chromium unpacked dari folder `.output/chrome-mv3` untuk pengujian lokal. Firefox memakai output `.output/firefox-mv2` sesuai target WXT saat ini.
 
+## Deployment production
+
+- Panduan ringkas menjalankan aplikasi secara online: [`docs/production-online.md`](docs/production-online.md)
+- Referensi deployment VPS lengkap: [`docs/deployment-vps.md`](docs/deployment-vps.md)
+
 ## Status implementasi
 
 Fondasi, kontrak, policy dasar, primitive WebCrypto, health API, dashboard awal, dan alur optional host permission telah tersedia. Pairing, database/auth, encrypted invitation, capture/apply cookie, dan sync relay berikutnya masih harus diimplementasikan sebelum data sesi nyata digunakan. "Siap produksi" pada kondisi ini berarti fondasi dapat di-build dan dioperasikan secara aman untuk evaluasi, bukan bahwa alur produk utama sudah lengkap.

@@ -1,5 +1,8 @@
 # Panduan Deploy PinjamAkun ke VPS
 
+Untuk alur ringkas dari build sampai website dapat dibuka melalui HTTPS, baca
+[`production-online.md`](production-online.md). Dokumen ini adalah referensi operasional lengkap.
+
 Panduan ini men-deploy kondisi repository PinjamAkun saat ini pada VPS Ubuntu 22.04/24.04 menggunakan:
 
 - Nginx lokal sebagai reverse proxy dan static file server.
